@@ -5,6 +5,7 @@
 
 import { RealHeadline, HeadlineSource, CachedHeadlines } from '@/types/game';
 import { sanitizeText, isValidUrl } from './security';
+import { MOCK_HEADLINES } from './mock-headlines';
 
 // In-memory cache (in production, use Redis or similar)
 const headlineCache = new Map<string, CachedHeadlines>();
@@ -128,12 +129,16 @@ export async function getHeadlines(
     // Fetch new headlines
     let headlines: RealHeadline[] = [];
     
-    if (source.type === 'rss') {
-      headlines = await fetchRSSHeadlines(source);
+    try {
+      if (source.type === 'rss') {
+        headlines = await fetchRSSHeadlines(source);
+      }
+      // Add more source types here (API, etc.)
+    } catch (error) {
+      console.error(`Failed to fetch from ${source.name}:`, error);
     }
-    // Add more source types here (API, etc.)
     
-    // Update cache
+    // Update cache if successful
     if (headlines.length > 0) {
       headlineCache.set(cacheKey, {
         source: source.name,
@@ -143,6 +148,12 @@ export async function getHeadlines(
       });
       allHeadlines.push(...headlines);
     }
+  }
+  
+  // Fallback to mock headlines if no real ones available
+  if (allHeadlines.length < 2) {
+    console.log('Using mock headlines as fallback');
+    return MOCK_HEADLINES;
   }
   
   return allHeadlines;
@@ -160,12 +171,16 @@ export function selectRandomHeadlines(
     return [];
   }
   
-  // Use seed for reproducibility if provided
-  const rng = seed ? seededRandom(seed) : Math.random;
+  // Fisher-Yates shuffle
+  const result = [...headlines];
+  const rng = seed ? seededRandom(seed) : (() => Math.random());
   
-  // Shuffle and take first N
-  const shuffled = [...headlines].sort(() => rng() - 0.5);
-  return shuffled.slice(0, Math.min(count, shuffled.length));
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  
+  return result.slice(0, Math.min(count, result.length));
 }
 
 /**

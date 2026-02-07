@@ -36,7 +36,6 @@ export interface Round {
   seed: string; // Daily seed for reproducibility
   headlines: GameHeadline[];
   correctAnswerId: string; // ID of the fake headline
-  startedAt?: Date;
 }
 
 // User's answer to a round
