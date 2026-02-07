@@ -9,6 +9,7 @@
 6. [Security: Time Pressure & Confidence Penalty](#security-time-pressure--confidence-penalty)
 7. [Data Flow Diagrams](#data-flow-diagrams)
 8. [Deployment Considerations](#deployment-considerations)
+9. [Code Quality & Developer Experience](#code-quality--developer-experience)
 
 ---
 
@@ -27,7 +28,8 @@
 - **Next.js 16+** (App Router, React Server Components, Server Actions)
 - **TypeScript** (Strict mode for type safety)
 - **Tailwind CSS** (Utility-first styling)
-- **ESLint** (Code quality)
+- **ESLint** (Code quality and linting)
+- **Prettier** (Code formatting - recommended for consistency)
 
 ---
 
@@ -64,6 +66,8 @@ two-truths/
 │
 ├── public/                           # Static assets (if needed)
 ├── .gitignore                        # Git ignore rules
+├── .prettierrc.json                  # Prettier formatting configuration
+├── .prettierignore                   # Prettier ignore patterns
 ├── ARCHITECTURE.md                   # This file
 ├── IMPLEMENTATION.md                 # Implementation guide
 ├── README.md                         # User-facing documentation
@@ -1124,6 +1128,188 @@ export default function Error({ error, reset }) {
     </div>
   );
 }
+```
+
+---
+
+## Code Quality & Developer Experience
+
+### ESLint Configuration
+
+**Current Setup** (`eslint.config.mjs`):
+```javascript
+import tseslint from '@typescript-eslint/eslint-plugin';
+import tsParser from '@typescript-eslint/parser';
+
+export default [
+  {
+    ignores: ['.next/**', 'node_modules/**', 'out/**', '*.config.js'],
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parser: tsParser,
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+  },
+];
+```
+
+**Linting Command**:
+```bash
+npm run lint       # Check for issues
+npm run lint:fix   # Auto-fix issues (add to package.json)
+```
+
+### Prettier Setup (Recommended)
+
+**Install Prettier**:
+```bash
+npm install --save-dev prettier eslint-config-prettier
+```
+
+**Configuration** (`.prettierrc.json`):
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "arrowParens": "avoid"
+}
+```
+
+**Ignore File** (`.prettierignore`):
+```
+.next/
+node_modules/
+out/
+build/
+dist/
+coverage/
+*.config.js
+*.config.ts
+package-lock.json
+```
+
+**Package.json Scripts**:
+```json
+{
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  }
+}
+```
+
+**ESLint + Prettier Integration**:
+```javascript
+// eslint.config.mjs
+import prettier from 'eslint-config-prettier';
+
+export default [
+  // ... existing config
+  prettier, // Disables ESLint rules that conflict with Prettier
+];
+```
+
+### Pre-commit Hooks (Optional)
+
+**Install Husky + lint-staged**:
+```bash
+npm install --save-dev husky lint-staged
+npx husky init
+```
+
+**Configure** (`.husky/pre-commit`):
+```bash
+#!/bin/sh
+npx lint-staged
+```
+
+**lint-staged config** (`package.json`):
+```json
+{
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/**/*.{json,css,md}": [
+      "prettier --write"
+    ]
+  }
+}
+```
+
+### TypeScript Configuration
+
+**Strict Mode** (`tsconfig.json`):
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    // ... other Next.js defaults
+  }
+}
+```
+
+**Benefits**:
+- Catch more errors at compile time
+- Better IntelliSense in VS Code
+- Enforce best practices
+
+### VS Code Settings (Recommended)
+
+**Workspace Settings** (`.vscode/settings.json`):
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
+```
+
+### CI/CD Quality Checks
+
+**GitHub Actions** (`.github/workflows/ci.yml`):
+```yaml
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run build
 ```
 
 ---
