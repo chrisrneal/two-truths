@@ -79,8 +79,8 @@ export async function createRound(seed: string, roundIndex: number): Promise<Rou
   // Step 5: Return Round object
   return {
     roundId: `${seed}-${roundIndex}`,
-    seed: seed,
-    roundIndex: roundIndex,
+    seed,
+    roundIndex,
     startedAt: new Date(),
     items: shuffledItems,
     correctItemId: fakeItem.id, // Keep server-side, do not expose to client

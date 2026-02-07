@@ -212,6 +212,8 @@ function runTests(): void {
 }
 
 // Run tests if this file is executed directly
+// Note: This check works with tsx/ts-node but may not work in all environments
+// For production use, consider a proper testing framework like Jest or Vitest
 if (import.meta.url === `file://${process.argv[1]}`) {
   runTests();
 }
