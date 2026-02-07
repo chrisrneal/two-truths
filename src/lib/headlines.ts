@@ -13,6 +13,9 @@ import { getRealHeadlines as getNewsHeadlines, HeadlineItem } from './news/fetch
 // Re-export for backward compatibility
 export { clearCache as clearHeadlineCache } from './news/fetchRss';
 
+// Minimum number of headlines required before falling back to mock data
+const MIN_HEADLINES_REQUIRED = 2;
+
 /**
  * Convert HeadlineItem from news module to RealHeadline for game use
  */
@@ -52,7 +55,7 @@ export async function getHeadlines(
     const headlines = newsItems.map(convertToRealHeadline);
     
     // Fallback to mock headlines if insufficient real ones
-    if (headlines.length < 2) {
+    if (headlines.length < MIN_HEADLINES_REQUIRED) {
       console.log('Using mock headlines as fallback');
       return MOCK_HEADLINES;
     }

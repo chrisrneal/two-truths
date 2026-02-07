@@ -6,7 +6,19 @@
 import Parser from 'rss-parser';
 import { NewsSource, CANADIAN_NEWS_SOURCES } from './sources';
 
-// Normalized headline item structure
+// Constants for filtering and caching
+const MIN_TITLE_LENGTH = 10; // Minimum characters for valid headline
+const MAX_SPECIAL_CHAR_RATIO = 0.3; // Max 30% special characters
+const MAX_UPPERCASE_RATIO = 0.5; // Max 50% uppercase in longer titles
+const MIN_TITLE_LENGTH_FOR_CAPS_CHECK = 20; // Only check caps ratio for titles this long
+const SIMILARITY_THRESHOLD = 0.7; // 70% word overlap = too similar
+const CACHE_VALIDITY_MS = 30 * 60 * 1000; // 30 minutes cache validity
+
+// Constants for seeded random number generator (LCG parameters)
+// Using standard linear congruential generator values for good distribution
+const LCG_MULTIPLIER = 9301;
+const LCG_INCREMENT = 49297;
+const LCG_MODULUS = 233280;
 export interface HeadlineItem {
   id: string;
   title: string;
@@ -149,8 +161,10 @@ function calculateSimilarity(str1: string, str2: string): number {
 
 /**
  * Remove overly similar headlines (keep first occurrence)
+ * Note: O(n²) complexity - for better performance with large datasets,
+ * consider using LSH (Locality-Sensitive Hashing) or limiting comparison pool
  */
-function filterSimilarHeadlines(headlines: HeadlineItem[], threshold: number = 0.7): HeadlineItem[] {
+function filterSimilarHeadlines(headlines: HeadlineItem[], threshold: number = SIMILARITY_THRESHOLD): HeadlineItem[] {
   const filtered: HeadlineItem[] = [];
 
   for (const headline of headlines) {
@@ -177,23 +191,23 @@ function filterSimilarHeadlines(headlines: HeadlineItem[], threshold: number = 0
  * Filter out: very short titles, titles with odd characters, invalid format
  */
 function isValidHeadline(title: string): boolean {
-  // Remove very short titles (less than 10 characters)
-  if (title.length < 10) {
+  // Remove very short titles
+  if (title.length < MIN_TITLE_LENGTH) {
     return false;
   }
 
-  // Remove titles with excessive special characters (more than 30%)
+  // Remove titles with excessive special characters
   const specialCharCount = (title.match(/[^a-zA-Z0-9\s]/g) || []).length;
-  if (specialCharCount / title.length > 0.3) {
+  if (specialCharCount / title.length > MAX_SPECIAL_CHAR_RATIO) {
     return false;
   }
 
   // Remove titles with unusual character patterns
-  // Check for excessive caps (more than 50% uppercase in titles longer than 20 chars)
-  if (title.length > 20) {
+  // Check for excessive caps in longer titles
+  if (title.length > MIN_TITLE_LENGTH_FOR_CAPS_CHECK) {
     const upperCount = (title.match(/[A-Z]/g) || []).length;
     const letterCount = (title.match(/[a-zA-Z]/g) || []).length;
-    if (letterCount > 0 && upperCount / letterCount > 0.5) {
+    if (letterCount > 0 && upperCount / letterCount > MAX_UPPERCASE_RATIO) {
       return false;
     }
   }
@@ -210,7 +224,8 @@ function isValidHeadline(title: string): boolean {
  * Filter headlines by age
  */
 function filterByAge(headlines: HeadlineItem[], maxAgeHours: number): HeadlineItem[] {
-  const cutoffTime = Date.now() - (maxAgeHours * 60 * 60 * 1000);
+  const millisecondsPerHour = 60 * 60 * 1000; // 3600000 ms in 1 hour
+  const cutoffTime = Date.now() - (maxAgeHours * millisecondsPerHour);
   
   return headlines.filter(headline => 
     headline.publishedAt.getTime() >= cutoffTime
@@ -236,6 +251,7 @@ function generateId(source: string, url: string): string {
 
 /**
  * Seeded random number generator for deterministic selection
+ * Uses Linear Congruential Generator (LCG) algorithm
  */
 function createSeededRandom(seed: string): () => number {
   let hash = 0;
@@ -246,8 +262,8 @@ function createSeededRandom(seed: string): () => number {
   }
   
   return function() {
-    hash = (hash * 9301 + 49297) % 233280;
-    return hash / 233280;
+    hash = (hash * LCG_MULTIPLIER + LCG_INCREMENT) % LCG_MODULUS;
+    return hash / LCG_MODULUS;
   };
 }
 
@@ -282,9 +298,8 @@ export async function getRealHeadlines(
   // Check cache first (memoization)
   const cacheKey = `${seed}-${maxAgeHours}`;
   const cached = headlineCache.get(cacheKey);
-  const cacheValidityMs = 30 * 60 * 1000; // 30 minutes
   
-  if (cached && Date.now() - cached.timestamp < cacheValidityMs) {
+  if (cached && Date.now() - cached.timestamp < CACHE_VALIDITY_MS) {
     // Return cached results (already shuffled and filtered)
     return cached.headlines.slice(0, count);
   }
